@@ -1,0 +1,16 @@
+{
+  "version": "1.0.0",
+  "thumbnail": "assets/thumbnail.png",
+  "id": "com_dav1dfn_BetterVolumeMixer",
+  "name": "Better Volume Mixer",
+  "app-version": "1.0.0-alpha",
+  "author": "dav1d-fn",
+  "github": "https://github.com/dav1d-fn/BetterVolumeMixer",
+  "descriptions": {
+    "en_US": "A per-app volume mixer for StreamController. Shows active audio apps in columns with volume controls, priority sorting, custom icons, and page navigation. Optimized for the Stream Deck MK.2."
+  },
+  "short-descriptions": {
+    "en_US": "Per-app volume mixer with priority list, custom icons, and page navigation."
+  },
+  "tags": ["volume", "audio", "mixer", "pipewire", "pulseaudio", "per-app"]
+}
