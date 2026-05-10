@@ -19,8 +19,67 @@ from plugins.com_dav1dfn_BetterVolumeMixer.actions.AppDisplay.AppDisplay import 
 
 SLOTS_PER_PAGE = 4
 
+# Sentinel key used for the master system-sound sink entry
+MASTER_SINK_KEY = "__master__"
+
+
+class _PinnedPlaceholder:
+    """Represents a pinned app that is currently not running."""
+    def __init__(self, raw_key: str, plugin):
+        self._raw_key = raw_key
+        self._plugin = plugin
+        self.mute = False
+        self.index = -1
+        self.proplist: dict = {}
+
+    def display_name(self) -> str:
+        if self._raw_key == MASTER_SINK_KEY:
+            return "System"
+        overrides = self._plugin.get_display_name_overrides()
+        if self._raw_key in overrides:
+            return overrides[self._raw_key]
+        # Key is "appname|binary" — use binary part as default display
+        parts = self._raw_key.split("|", 1)
+        binary = parts[1] if len(parts) == 2 and parts[1] else parts[0]
+        return BetterVolumeMixer.KNOWN_BINARY_ALIASES.get(binary, binary)
+
+
+class _MasterSink:
+    """Wraps a PulseAudio sink (output device) to look like a sink-input."""
+    def __init__(self, sink):
+        self._sink = sink
+        self.mute = sink.mute
+        self.index = sink.index
+        self.proplist: dict = {"application.name": "System", "application.process.binary": ""}
+
+    @property
+    def raw_sink(self):
+        return self._sink
+
 
 class BetterVolumeMixer(PluginBase):
+    # Maps binary name → nice display name
+    KNOWN_BINARY_ALIASES: dict[str, str] = {
+        "discord":          "Discord",
+        "spotify":          "Spotify",
+        "slack":            "Slack",
+        "teams":            "MS Teams",
+        "zoom":             "Zoom",
+        "telegram-desktop": "Telegram",
+        "thunderbird":      "Thunderbird",
+        "firefox":          "Firefox",
+        "vivaldi":          "Vivaldi",
+        "brave-browser":    "Brave",
+        "signal-desktop":   "Signal",
+        "obs":              "OBS",
+        "vlc":              "VLC",
+        "mpv":              "mpv",
+        "steam":            "Steam",
+        "chromium":         "Chromium",
+        "google-chrome":    "Chrome",
+        "chrome":           "Chrome",
+    }
+
     def __init__(self):
         super().__init__()
 
@@ -99,7 +158,14 @@ class BetterVolumeMixer(PluginBase):
                     return json.load(f)
             except Exception:
                 pass
-        return {"priority_list": [], "hidden_list": []}
+        # Master sink is always in the priority list by default
+        return {
+            "priority_list": [MASTER_SINK_KEY],
+            "hidden_list": [],
+            "pinned_list": [MASTER_SINK_KEY],
+            "display_name_overrides": {},
+            "custom_icons": {},
+        }
 
     def save_plugin_settings(self):
         try:
@@ -122,6 +188,20 @@ class BetterVolumeMixer(PluginBase):
         self._plugin_settings["hidden_list"] = lst
         self.save_plugin_settings()
 
+    def get_pinned_list(self) -> list[str]:
+        return self._plugin_settings.get("pinned_list", [])
+
+    def set_pinned_list(self, lst: list[str]):
+        self._plugin_settings["pinned_list"] = lst
+        self.save_plugin_settings()
+
+    def get_display_name_overrides(self) -> dict[str, str]:
+        return self._plugin_settings.get("display_name_overrides", {})
+
+    def set_display_name_overrides(self, d: dict[str, str]):
+        self._plugin_settings["display_name_overrides"] = d
+        self.save_plugin_settings()
+
     def get_custom_icons(self) -> dict[str, str]:
         return self._plugin_settings.get("custom_icons", {})
 
@@ -139,38 +219,84 @@ class BetterVolumeMixer(PluginBase):
                 pass
             time.sleep(1.0)
 
+    def _make_sink_key(self, sink) -> str:
+        """Composite key: 'application.name|binary'. Falls back gracefully."""
+        p = sink.proplist
+        app_name = p.get("application.name", "") or ""
+        binary   = p.get("application.process.binary", "") or ""
+        return f"{app_name}|{binary}"
+
     def _refresh_sinks(self):
         try:
-            # Always fetch fresh list — pulsectl only returns currently active sinks
-            all_sinks = self.pulse.sink_input_list()
+            all_inputs = self.pulse.sink_input_list()
+            all_sinks  = self.pulse.sink_list()
         except Exception:
             return
 
-        hidden = self.get_hidden_list()
+        hidden   = self.get_hidden_list()
         priority = self.get_priority_list()
+        pinned   = self.get_pinned_list()
 
-        # Auto-register newly seen apps into priority list
+        # Ensure master sink entry exists in priority list
+        if MASTER_SINK_KEY not in priority and MASTER_SINK_KEY not in hidden:
+            priority.insert(0, MASTER_SINK_KEY)
+            self.set_priority_list(priority)
+
+        # Auto-register newly seen sink-inputs
         known = set(priority + hidden)
         changed = False
-        for s in all_sinks:
-            name = self._app_name(s)
-            if name and name not in known:
-                priority.append(name)
-                known.add(name)
+        for s in all_inputs:
+            key = self._make_sink_key(s)
+            if key and key not in known:
+                priority.append(key)
+                known.add(key)
                 changed = True
         if changed:
             self.set_priority_list(priority)
 
-        # Filter hidden, sort by priority
-        visible = [s for s in all_sinks if self._app_name(s) not in hidden]
+        # Build lookup of running sink-inputs keyed by composite key
+        running: dict[str, object] = {}
+        for s in all_inputs:
+            key = self._make_sink_key(s)
+            if key not in running:
+                running[key] = s
 
-        def sort_key(sink):
-            try:
-                return priority.index(self._app_name(sink))
-            except ValueError:
-                return len(priority)
+        # Pick the default output sink (active playback device)
+        try:
+            default_name = self.pulse.server_info().default_sink_name
+            master_sink = next((s for s in all_sinks if s.name == default_name), None)
+        except Exception:
+            master_sink = None
+        if master_sink is None and all_sinks:
+            master_sink = all_sinks[0]  # fallback
 
-        self.active_sinks = sorted(visible, key=sort_key)
+        # Build final ordered list respecting priority order.
+        # Pinned entries always appear (placeholder if not running).
+        # Non-pinned entries only appear when actually running.
+        result = []
+        seen_keys = set()
+
+        for key in priority:
+            if key in hidden:
+                continue
+            if key == MASTER_SINK_KEY:
+                entry = _MasterSink(master_sink) if master_sink else _PinnedPlaceholder(key, self)
+                result.append(entry)
+                seen_keys.add(key)
+            elif key in pinned:
+                entry = running[key] if key in running else _PinnedPlaceholder(key, self)
+                result.append(entry)
+                seen_keys.add(key)
+            elif key in running:
+                result.append(running[key])
+                seen_keys.add(key)
+
+        # Append any running sinks not yet in priority list (newly detected, not yet saved)
+        for key, sink in running.items():
+            if key not in seen_keys and key not in hidden:
+                result.append(sink)
+
+        self.active_sinks = result
 
         max_offset = max(0, (len(self.active_sinks) - 1) // SLOTS_PER_PAGE)
         if self.page_offset > max_offset:
@@ -178,40 +304,40 @@ class BetterVolumeMixer(PluginBase):
 
         self._notify_actions()
 
+    # ── Name/icon helpers ─────────────────────────────────────────────────
+
+    def _app_raw_key(self, sink) -> str:
+        """Internal composite key for the sink."""
+        if isinstance(sink, _PinnedPlaceholder):
+            return sink._raw_key
+        if isinstance(sink, _MasterSink):
+            return MASTER_SINK_KEY
+        return self._make_sink_key(sink)
+
     def _app_name(self, sink) -> str:
+        """Display name: user override → binary alias → binary → app name."""
+        if isinstance(sink, _PinnedPlaceholder):
+            return sink.display_name()
+        if isinstance(sink, _MasterSink):
+            key = MASTER_SINK_KEY
+            overrides = self.get_display_name_overrides()
+            return overrides.get(key, "System")
+
+        key = self._app_raw_key(sink)
+        overrides = self.get_display_name_overrides()
+        if key in overrides:
+            return overrides[key]
+
         p = sink.proplist
-        return (p.get("application.name")
-                or p.get("application.process.binary")
-                or p.get("media.name")
-                or "Unknown")
+        binary = p.get("application.process.binary", "") or ""
+        if binary:
+            return self.KNOWN_BINARY_ALIASES.get(binary, binary)
+        return p.get("application.name", "") or "Unknown"
 
     def _app_icon_name(self, sink) -> str:
+        if isinstance(sink, (_PinnedPlaceholder, _MasterSink)):
+            return ""
         return sink.proplist.get("application.icon_name", "")
-
-    def _app_binary(self, sink) -> str:
-        return sink.proplist.get("application.process.binary", "")
-
-    # ── Icon resolution ───────────────────────────────────────────────────
-
-    def resolve_icon(self, sink) -> str | None:
-        """Find an icon for a sink — same logic that worked before."""
-        icon_name = self._app_icon_name(sink)
-        if not icon_name:
-            return None
-
-        search_dirs = [
-            "/usr/share/icons/hicolor/64x64/apps",
-            "/usr/share/icons/hicolor/48x48/apps",
-            "/usr/share/icons/Adwaita/48x48/apps",
-            os.path.expanduser("~/.local/share/icons/hicolor/48x48/apps"),
-            "/usr/share/pixmaps",
-        ]
-        for d in search_dirs:
-            for ext in ("png", "svg", "xpm"):
-                p = os.path.join(d, f"{icon_name}.{ext}")
-                if os.path.exists(p):
-                    return p
-        return None
 
     # ── Slot/volume helpers ───────────────────────────────────────────────
 
@@ -223,30 +349,40 @@ class BetterVolumeMixer(PluginBase):
 
     def get_volume(self, slot: int) -> int | None:
         sink = self.get_sink_for_slot(slot)
-        if sink is None:
+        if sink is None or isinstance(sink, _PinnedPlaceholder):
             return None
         try:
+            if isinstance(sink, _MasterSink):
+                return round(self.pulse.volume_get_all_chans(sink.raw_sink) * 100)
             return round(self.pulse.volume_get_all_chans(sink) * 100)
         except Exception:
             return None
 
     def change_volume(self, slot: int, delta: float):
         sink = self.get_sink_for_slot(slot)
-        if sink is None:
+        if sink is None or isinstance(sink, _PinnedPlaceholder):
             return
         try:
-            vol = self.pulse.volume_get_all_chans(sink)
-            self.pulse.volume_set_all_chans(sink, max(0.0, min(1.5, vol + delta)))
+            if isinstance(sink, _MasterSink):
+                vol = self.pulse.volume_get_all_chans(sink.raw_sink)
+                self.pulse.volume_set_all_chans(sink.raw_sink, max(0.0, min(1.5, vol + delta)))
+            else:
+                vol = self.pulse.volume_get_all_chans(sink)
+                self.pulse.volume_set_all_chans(sink, max(0.0, min(1.5, vol + delta)))
             self._notify_actions()
         except Exception:
             pass
 
     def toggle_mute(self, slot: int):
         sink = self.get_sink_for_slot(slot)
-        if sink is None:
+        if sink is None or isinstance(sink, _PinnedPlaceholder):
             return
         try:
-            self.pulse.sink_input_mute(sink.index, not sink.mute)
+            if isinstance(sink, _MasterSink):
+                rs = sink.raw_sink
+                self.pulse.sink_mute(rs.index, not rs.mute)
+            else:
+                self.pulse.sink_input_mute(sink.index, not sink.mute)
             self._refresh_sinks()
         except Exception:
             pass
@@ -278,7 +414,6 @@ class BetterVolumeMixer(PluginBase):
 
     def _notify_actions(self):
         from gi.repository import GLib
-        # Always dispatch UI updates on the GTK main thread
         GLib.idle_add(self._notify_actions_gtk)
 
     def _notify_actions_gtk(self):
@@ -287,7 +422,7 @@ class BetterVolumeMixer(PluginBase):
                 action.on_sinks_updated()
             except Exception:
                 pass
-        return False  # Don't repeat
+        return False
 
     def __del__(self):
         self._stop_polling.set()
