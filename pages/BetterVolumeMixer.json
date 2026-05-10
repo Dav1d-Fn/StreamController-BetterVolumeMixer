@@ -1,0 +1,154 @@
+{
+    "keys": {
+        "0x0": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::NavBack", "settings": {}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "0x1": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::NavRight", "settings": {}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "0x2": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::NavLeft", "settings": {}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "1x0": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 0, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "1x1": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 0, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "1x2": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 0, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "2x0": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 1, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "2x1": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 1, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "2x2": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 1, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "3x0": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 2, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "3x1": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 2, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "3x2": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 2, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "4x0": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 3, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "4x1": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 3, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "4x2": {
+            "states": {
+                "0": {
+                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 3, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "image-control-action": 0,
+                    "label-control-actions": [0, 0, 0],
+                    "background-control-action": 0
+                }
+            }
+        }
+    }
+}
