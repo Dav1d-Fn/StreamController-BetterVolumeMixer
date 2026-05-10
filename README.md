@@ -6,8 +6,7 @@ A per-app volume mixer plugin for [StreamController](https://github.com/StreamCo
 
 ---
 
-<!-- Replace this with your own GIF -->
-![Better Volume Mixer Demo](assets/demo.gif)
+![Demo](assets/BetterVolumeMixerPreview.mp4)
 
 ---
 
