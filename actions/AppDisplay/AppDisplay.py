@@ -4,6 +4,7 @@ gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
 from gi.repository import Gtk, Adw, GdkPixbuf, Gio
 import os
+from PIL import Image
 
 
 def _get_plugin_classes():
@@ -37,6 +38,7 @@ class AppDisplay(ActionBase):
 
     def on_ready(self):
         self.plugin_base.register_action(self)
+        self._last_icon_key = None  # reset on each page load so icon is always redrawn
         s = self.get_settings()
         changed = False
         for k, v in DEFAULTS.items():
@@ -60,12 +62,16 @@ class AppDisplay(ActionBase):
     def _resolve_label(self, content_key, custom_key, slot, sink) -> str:
         s = self.get_settings()
         mode = s.get(content_key, DEFAULTS[content_key])
+        _, _PinnedPlaceholder, _MasterSink, _ = _get_plugin_classes()
         if mode == "appname":
             return self.plugin_base._app_name(sink)[:10] if sink else ""
         elif mode == "volume":
             if sink is None:
                 return ""
             vol = self.plugin_base.get_volume(slot)
+            is_placeholder = isinstance(sink, _PinnedPlaceholder)
+            if is_placeholder:
+                return f"{vol}%" if vol is not None else "—"
             prefix = "[M] " if sink.mute else ""
             return f"{prefix}{vol}%" if vol is not None else ""
         return s.get(custom_key, "")
@@ -78,41 +84,106 @@ class AppDisplay(ActionBase):
 
         BetterVolumeMixer, _PinnedPlaceholder, _MasterSink, MASTER_SINK_KEY = _get_plugin_classes()
 
+        is_placeholder = isinstance(sink, _PinnedPlaceholder) if sink else False
+        raw_key = self.plugin_base._app_raw_key(sink) if sink else None
+        app_name = self.plugin_base._app_name(sink) if sink else ""
+
+        # Only update icon when the slot content changes (avoids resetting GIF animation)
+        if raw_key != self._last_icon_key:
+            self._last_icon_key = raw_key
+            if sink is None:
+                self.set_media(media_path=None)
+            elif is_placeholder:
+                # Placeholder: show custom icon if set
+                if show_icon:
+                    custom_icons = self.plugin_base.get_custom_icons()
+                    if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
+                        self._set_icon(custom_icons[raw_key])
+            elif show_icon:
+                BetterVolumeMixer2, _PP2, _MasterSink2, _MSK2 = _get_plugin_classes()
+                is_master = isinstance(sink, _MasterSink2)
+                custom_icons = self.plugin_base.get_custom_icons()
+                if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
+                    icon_path = custom_icons[raw_key]
+                elif is_master:
+                    icon_path = None
+                else:
+                    icon_path = self._find_icon(self.plugin_base._app_icon_name(sink), app_name)
+                if icon_path:
+                    self._set_icon(icon_path)
+                # No icon found: don't call set_media — avoids placeholder image
+
         if sink is None:
-            self.set_media(media_path=None)
             self.set_top_label("")
             self.set_center_label("—")
             self.set_bottom_label("")
             return
 
-        is_placeholder = isinstance(sink, _PinnedPlaceholder)
-        app_name = self.plugin_base._app_name(sink)
-
-        # Icon
-        if show_icon and not is_placeholder:
-            BetterVolumeMixer2, _PP2, _MasterSink2, _MSK2 = _get_plugin_classes()
-            is_master = isinstance(sink, _MasterSink2)
-            custom_icons = self.plugin_base.get_custom_icons()
-            raw_key = self.plugin_base._app_raw_key(sink)
-            if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
-                icon_path = custom_icons[raw_key]
-            elif is_master:
-                icon_path = None  # No default icon for system/master sink
-            else:
-                icon_path = self._find_icon(self.plugin_base._app_icon_name(sink), app_name)
-            self.set_media(media_path=icon_path, size=0.6) if icon_path else self.set_media(media_path=None)
-        else:
-            self.set_media(media_path=None)
-
         if is_placeholder:
-            self.set_top_label(app_name[:10])
-            self.set_center_label("off")
-            self.set_bottom_label("")
+            self.set_top_label(self._resolve_label("top_content", "custom_top", slot, sink))
+            self.set_center_label(self._resolve_label("center_content", "custom_center", slot, sink))
+            self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom", slot, sink))
             return
 
         self.set_top_label(self._resolve_label("top_content", "custom_top", slot, sink))
         self.set_center_label(self._resolve_label("center_content", "custom_center", slot, sink))
         self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom", slot, sink))
+
+    def _gif_fps(self, path: str) -> int:
+        """Read the average FPS from a GIF's frame delays. Returns 10 as fallback."""
+        try:
+            with Image.open(path) as img:
+                delays = []
+                for i in range(getattr(img, "n_frames", 1)):
+                    img.seek(i)
+                    d = img.info.get("duration", 100)
+                    if d > 0:
+                        delays.append(d)
+                if not delays:
+                    return 10
+                avg_delay_ms = sum(delays) / len(delays)
+                return max(1, round(1000 / avg_delay_ms))
+        except Exception:
+            return 10
+
+    def _reset_icon_cache(self):
+        """Reset icon cache for all AppDisplay actions so icons are redrawn on next update."""
+        for action in self.plugin_base._registered_actions:
+            if type(action).__name__ == "AppDisplay":
+                action._last_icon_key = None
+
+    def _set_icon(self, path: str):
+        """Set icon via set_media, using PIL for non-GIF images to preserve transparency."""
+        img = self._open_image_rgba(path)
+        if img:
+            self.set_media(image=img, size=0.6)
+        else:
+            self._set_media_path(path)
+
+    def _set_media_path(self, path: str, size: float = 0.6):
+        """Call set_media with the correct fps for GIFs, or plain media_path for others."""
+        if not path:
+            self.set_media(media_path=None)
+            return
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".gif":
+            fps = self._gif_fps(path)
+            self.set_media(media_path=path, size=size, fps=fps)
+        else:
+            self.set_media(media_path=path, size=size)
+
+    def _open_image_rgba(self, path: str) -> "Image.Image | None":
+        """Open any non-GIF image as RGBA PIL Image, preserving transparency. Returns None on failure."""
+        if not path:
+            return None
+        ext = os.path.splitext(path)[1].lower()
+        if ext == ".gif":
+            return None  # GIFs handled via media_path to preserve animation
+        try:
+            img = Image.open(path)
+            return img.convert("RGBA")
+        except Exception:
+            return None
 
     def _find_icon(self, icon_name: str, app_name: str) -> str | None:
         if icon_name:
@@ -698,11 +769,13 @@ class AppDisplay(ActionBase):
                     icons[raw_key] = path
                     self.plugin_base.set_custom_icons(icons)
                     self._rebuild_priority_list()
+                    self._reset_icon_cache()
                     self.plugin_base._notify_actions()
             elif response == "clear":
                 icons.pop(raw_key, None)
                 self.plugin_base.set_custom_icons(icons)
                 self._rebuild_priority_list()
+                self._reset_icon_cache()
                 self.plugin_base._notify_actions()
             d.destroy()
 
