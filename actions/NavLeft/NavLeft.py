@@ -27,6 +27,7 @@ class NavLeft(ActionBase):
 
     def on_ready(self):
         self.plugin_base.register_action(self)
+        self._last_icon_path = None  # reset on each page load so icon is always redrawn
         # Write defaults for any missing keys so settings are always initialized
         s = self.get_settings()
         changed = False
@@ -45,6 +46,9 @@ class NavLeft(ActionBase):
         self.plugin_base.nav_left()
 
     def on_sinks_updated(self):
+        self._update_labels()
+
+    def _update_labels(self):
         self._update_display()
 
     def _resolve_label(self, content_key, custom_key) -> str:
@@ -69,10 +73,13 @@ class NavLeft(ActionBase):
             return
 
         if custom_icon and os.path.exists(custom_icon):
-            self.set_media(media_path=custom_icon, size=0.75)
+            icon_path = custom_icon
         else:
             default = os.path.join(self.plugin_base.PATH, "assets", "nav_left.png")
-            self.set_media(media_path=default if os.path.exists(default) else None, size=0.75)
+            icon_path = default if os.path.exists(default) else None
+        if icon_path != self._last_icon_path:
+            self._last_icon_path = icon_path
+            self.set_media(media_path=icon_path, size=0.75)
 
         self.set_top_label(self._resolve_label("top_content", "custom_top"))
         self.set_center_label(self._resolve_label("center_content", "custom_center"))

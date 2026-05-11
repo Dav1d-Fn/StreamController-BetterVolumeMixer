@@ -86,6 +86,7 @@ class BetterVolumeMixer(PluginBase):
         self.pulse = pulsectl.Pulse("volume-mixer-pro", threading_lock=True)
         self.active_sinks: list = []
         self.page_offset: int = 0
+        self._volume_cache: dict[str, int] = {}  # raw_key -> last known volume %
         self._registered_actions: list = []
         self._plugin_settings: dict = self._load_plugin_settings()
 
@@ -270,6 +271,19 @@ class BetterVolumeMixer(PluginBase):
         if master_sink is None and all_sinks:
             master_sink = all_sinks[0]  # fallback
 
+        # Cache current volumes of all running sinks
+        for key, s in running.items():
+            try:
+                self._volume_cache[key] = round(self.pulse.volume_get_all_chans(s) * 100)
+            except Exception:
+                pass
+        # Also cache master sink volume
+        if master_sink is not None:
+            try:
+                self._volume_cache[MASTER_SINK_KEY] = round(self.pulse.volume_get_all_chans(master_sink) * 100)
+            except Exception:
+                pass
+
         # Build final ordered list respecting priority order.
         # Pinned entries always appear (placeholder if not running).
         # Non-pinned entries only appear when actually running.
@@ -349,14 +363,19 @@ class BetterVolumeMixer(PluginBase):
 
     def get_volume(self, slot: int) -> int | None:
         sink = self.get_sink_for_slot(slot)
-        if sink is None or isinstance(sink, _PinnedPlaceholder):
+        if sink is None:
             return None
+        if isinstance(sink, _PinnedPlaceholder):
+            return self._volume_cache.get(sink._raw_key)
         try:
             if isinstance(sink, _MasterSink):
-                return round(self.pulse.volume_get_all_chans(sink.raw_sink) * 100)
-            return round(self.pulse.volume_get_all_chans(sink) * 100)
+                vol = round(self.pulse.volume_get_all_chans(sink.raw_sink) * 100)
+            else:
+                vol = round(self.pulse.volume_get_all_chans(sink) * 100)
+            self._volume_cache[self._app_raw_key(sink)] = vol
+            return vol
         except Exception:
-            return None
+            return self._volume_cache.get(self._app_raw_key(sink))
 
     def change_volume(self, slot: int, delta: float):
         sink = self.get_sink_for_slot(slot)

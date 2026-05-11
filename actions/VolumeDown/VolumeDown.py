@@ -29,6 +29,7 @@ class VolumeDown(ActionBase):
 
     def on_ready(self):
         self.plugin_base.register_action(self)
+        self._last_icon_path = None  # reset on each page load so icon is always redrawn
         # Write defaults for any missing keys so settings are always initialized
         s = self.get_settings()
         changed = False
@@ -50,7 +51,14 @@ class VolumeDown(ActionBase):
         self.plugin_base.change_volume(slot, -step)
 
     def on_sinks_updated(self):
-        self._update_display()
+        self._update_labels()
+
+    def _update_labels(self):
+        s = self.get_settings()
+        slot = s.get("slot_index", 0)
+        self.set_top_label(self._resolve_label("top_content", "custom_top", slot))
+        self.set_center_label(self._resolve_label("center_content", "custom_center", slot))
+        self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom", slot))
 
     def _resolve_label(self, content_key: str, custom_key: str, slot: int) -> str:
         s = self.get_settings()
@@ -71,10 +79,13 @@ class VolumeDown(ActionBase):
         custom_icon = s.get("custom_icon_path", "").strip()
 
         if custom_icon and os.path.exists(custom_icon):
-            self.set_media(media_path=custom_icon, size=0.75)
+            icon_path = custom_icon
         else:
             default = os.path.join(self.plugin_base.PATH, "assets", "volume_down.png")
-            self.set_media(media_path=default if os.path.exists(default) else None, size=0.75)
+            icon_path = default if os.path.exists(default) else None
+        if icon_path != self._last_icon_path:
+            self._last_icon_path = icon_path
+            self.set_media(media_path=icon_path, size=0.75)
 
         self.set_top_label(self._resolve_label("top_content", "custom_top", slot))
         self.set_center_label(self._resolve_label("center_content", "custom_center", slot))

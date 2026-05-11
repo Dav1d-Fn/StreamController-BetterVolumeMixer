@@ -31,6 +31,7 @@ class OpenMixer(ActionBase):
 
     def on_ready(self):
         self.plugin_base.register_action(self)
+        self._last_icon_path = None  # reset on each page load so icon is always redrawn
         # Write defaults for any missing keys so settings are always initialized
         s = self.get_settings()
         changed = False
@@ -64,7 +65,12 @@ class OpenMixer(ActionBase):
             self.deck_controller.load_page(page)
 
     def on_sinks_updated(self):
-        self._update_display()
+        self._update_labels()
+
+    def _update_labels(self):
+        self.set_top_label(self._resolve_label("top_content", "custom_top"))
+        self.set_center_label(self._resolve_label("center_content", "custom_center"))
+        self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom"))
 
     def _resolve_label(self, content_key, custom_key) -> str:
         s = self.get_settings()
@@ -75,10 +81,14 @@ class OpenMixer(ActionBase):
         s = self.get_settings()
         custom_icon = s.get("custom_icon_path", "").strip()
         if custom_icon and os.path.exists(custom_icon):
-            self.set_media(media_path=custom_icon, size=0.75)
+            icon_path = custom_icon
         else:
             default = os.path.join(self.plugin_base.PATH, "assets", "open_mixer.png")
-            self.set_media(media_path=default if os.path.exists(default) else None, size=0.75)
+            icon_path = default if os.path.exists(default) else None
+        # Only call set_media when path changes to avoid resetting GIF animation
+        if icon_path != self._last_icon_path:
+            self._last_icon_path = icon_path
+            self.set_media(media_path=icon_path, size=0.75)
         self.set_top_label(self._resolve_label("top_content", "custom_top"))
         self.set_center_label(self._resolve_label("center_content", "custom_center"))
         self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom"))
