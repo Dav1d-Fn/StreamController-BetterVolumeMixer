@@ -1,4 +1,4 @@
-# Better Volume Mixer
+![Better Volume Mixer](assets/thumbnail.png)
 
 A per-app volume mixer plugin for [StreamController](https://github.com/StreamController/StreamController). Control the volume of individual applications directly from your Stream Deck — with priority sorting, custom icons, page navigation, and live volume display.
 
@@ -6,7 +6,6 @@ A per-app volume mixer plugin for [StreamController](https://github.com/StreamCo
 
 ---
 
-<!-- Replace this with your own GIF -->
 ![Better Volume Mixer Demo](assets/demo.gif)
 
 ---
@@ -66,9 +65,6 @@ The plugin ships with a pre-built **Better Volume Mixer** page. Place the **Open
 [ ← Prev       ]  [ Vol ▼  ]  [ Vol ▼  ]  [ Vol ▼  ]  [ Vol ▼  ]
   Navigation       Slot 0      Slot 1      Slot 2      Slot 3
 ```
-
-<!-- Replace with your own screenshot -->
-![Mixer page layout](assets/layout.png)
 
 ---
 
