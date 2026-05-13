@@ -27,29 +27,18 @@ A per-app volume mixer plugin for [StreamController](https://github.com/StreamCo
 ## Requirements
 
 - [StreamController](https://github.com/StreamController/StreamController)
-- Python package `pulsectl`:
-
-```bash
-pip install pulsectl --break-system-packages
-```
 
 ---
 
 ## Installation
 
-1. Go to [Releases](https://github.com/dav1d-fn/BetterVolumeMixer/releases) and download the latest `com_dav1dfn_BetterVolumeMixer.zip`
-2. Extract the ZIP — you'll get a folder called `com_dav1dfn_BetterVolumeMixer`
-3. Copy it into your StreamController plugins folder:
-
-```bash
-cp -r com_dav1dfn_BetterVolumeMixer \
-  ~/.var/app/com.core447.StreamController/data/plugins/
-```
-
+1. Open StreamController and go to **Settings → Store**
+2. Enable **Custom Repositories** and add this URL:
+   ```
+   https://github.com/Dav1d-Fn/StreamController-BetterVolumeMixer
+   ```
+3. Search for **Better Volume Mixer** in the Store and install it
 4. Restart StreamController
-
-> For native (non-Flatpak) installs the plugins folder may be at  
-> `~/.local/share/StreamController/plugins/`
 
 ---
 
