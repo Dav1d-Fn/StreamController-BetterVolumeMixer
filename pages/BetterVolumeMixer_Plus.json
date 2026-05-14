@@ -1,0 +1,255 @@
+{
+    "keys": {
+        "0x0": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavBack",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "Back",
+                                "custom_bottom": ""
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "1x0": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavLeft",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "page",
+                                "custom_top": "",
+                                "custom_center": "\u2190",
+                                "custom_bottom": "",
+                                "hide_on_single_page": true
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "2x0": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavRight",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "page",
+                                "custom_top": "",
+                                "custom_center": "\u2192",
+                                "custom_bottom": "",
+                                "hide_on_single_page": true
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "3x0": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::OpenMixer",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "Mixer",
+                                "custom_bottom": ""
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        }
+    },
+    "dials": {
+        "0": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::DialVolumeControl",
+                            "settings": {
+                                "slot_index": 0,
+                                "volume_step": 5
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "1": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::DialVolumeControl",
+                            "settings": {
+                                "slot_index": 1,
+                                "volume_step": 5
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "2": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::DialVolumeControl",
+                            "settings": {
+                                "slot_index": 2,
+                                "volume_step": 5
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        },
+        "3": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::DialVolumeControl",
+                            "settings": {
+                                "slot_index": 3,
+                                "volume_step": 5
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        }
+    },
+    "touchscreens": {
+        "sd-plus": {
+            "states": {
+                "0": {
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavLeft",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "page",
+                                "custom_top": "",
+                                "custom_center": "\u2190",
+                                "custom_bottom": "",
+                                "hide_on_single_page": true
+                            },
+                            "event-assignments": {
+                                "Touchscreen Drag Left": "Key Down",
+                                "Touchscreen Drag Right": null
+                            }
+                        },
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavRight",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "page",
+                                "custom_top": "",
+                                "custom_center": "\u2192",
+                                "custom_bottom": "",
+                                "hide_on_single_page": true
+                            },
+                            "event-assignments": {
+                                "Touchscreen Drag Left": null,
+                                "Touchscreen Drag Right": "Key Down"
+                            }
+                        }
+                    ],
+                    "image-control-action": 0,
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
+                    "background-control-action": 0
+                }
+            }
+        }
+    }
+}

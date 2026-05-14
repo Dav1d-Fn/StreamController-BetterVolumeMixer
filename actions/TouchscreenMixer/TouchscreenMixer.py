@@ -1,10 +1,12 @@
 from src.backend.PluginManager.ActionBase import ActionBase
+from src.backend.DeckManagement.InputIdentifier import Input
 import gi
 gi.require_version("Gtk", "4.0")
 gi.require_version("Adw", "1")
-from gi.repository import Gtk, Adw, GdkPixbuf, Gio
+from gi.repository import Gtk, Adw, Gio, GLib
+from PIL import Image, ImageDraw, ImageFont
 import os
-from PIL import Image
+import tempfile
 
 
 def _get_plugin_classes():
@@ -14,31 +16,38 @@ def _get_plugin_classes():
     return BetterVolumeMixer, _PinnedPlaceholder, _MasterSink, MASTER_SINK_KEY
 
 
-ROW_OPTIONS = ["Empty", "App Name", "Volume %", "Custom Text"]
-ROW_KEYS    = ["empty", "appname", "volume", "custom"]
-
 DEFAULTS = {
-    "slot_index":     0,
-    "show_icon":      True,
-    "top_content":    "appname",
-    "center_content": "custom",
-    "bottom_content": "volume",
-    "custom_top":     "",
-    "custom_center":  "",
-    "custom_bottom":  "",
-    "sync_settings":  True,
+    "icon_scale": 0.55,
 }
 
+_FONT_PATHS = [
+    "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
+    "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/noto/NotoSans-Regular.ttf",
+]
 
-class AppDisplay(ActionBase):
+
+def _get_font(size: int) -> ImageFont.ImageFont:
+    for path in _FONT_PATHS:
+        if os.path.exists(path):
+            try:
+                return ImageFont.truetype(path, size)
+            except Exception:
+                continue
+    return ImageFont.load_default()
+
+
+class TouchscreenMixer(ActionBase):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
+        self._temp_path: str | None = None
         self._selected_app: str | None = None
-        self._config_open = False
+        self._last_state_hash: str = ""
 
     def on_ready(self):
         self.plugin_base.register_action(self)
-        self._last_icon_key = None  # reset on each page load so icon is always redrawn
         s = self.get_settings()
         changed = False
         for k, v in DEFAULTS.items():
@@ -47,157 +56,180 @@ class AppDisplay(ActionBase):
                 changed = True
         if changed:
             self.set_settings(s)
-        self._update_display()
+        GLib.idle_add(self._update_display)
 
     def on_removed(self):
         self.plugin_base.unregister_action(self)
+        self._clear_display()
 
-    def on_key_down(self):
-        slot = self.get_settings().get("slot_index", 0)
-        self.plugin_base.toggle_mute(slot)
+    def event_callback(self, event, data=None):
+        if event == Input.Touchscreen.Events.DRAG_LEFT:
+            self.plugin_base.nav_right()
+            self.plugin_base._notify_actions()
+        elif event == Input.Touchscreen.Events.DRAG_RIGHT:
+            self.plugin_base.nav_left()
+            self.plugin_base._notify_actions()
 
     def on_sinks_updated(self):
         self._update_display()
 
-    def _resolve_label(self, content_key, custom_key, slot, sink) -> str:
-        s = self.get_settings()
-        mode = s.get(content_key, DEFAULTS[content_key])
+    # ── On-demand display ─────────────────────────────────────────────────
+
+    def _clear_display(self):
+        try:
+            page = self.deck_controller.active_page
+            if page is not None:
+                bg = (page.dict
+                      .get("touchscreens", {})
+                      .get("sd-plus", {})
+                      .get("states", {})
+                      .get("0", {})
+                      .get("background", {}))
+                bg.pop("image", None)
+        except Exception:
+            pass
+        try:
+            self.get_input().update()
+        except Exception:
+            pass
+
+    # ── Rendering ─────────────────────────────────────────────────────────
+
+    def _state_hash(self) -> str:
         _, _PinnedPlaceholder, _MasterSink, _ = _get_plugin_classes()
-        if mode == "appname":
-            return self.plugin_base._app_name(sink)[:10] if sink else ""
-        elif mode == "volume":
+        s = self.get_settings()
+        parts = [str(self.plugin_base.page_offset), str(s.get("icon_scale", DEFAULTS["icon_scale"]))]
+        for i in range(4):
+            idx = self.plugin_base.page_offset * 4 + i
+            sinks = self.plugin_base.active_sinks
+            sink = sinks[idx] if idx < len(sinks) else None
             if sink is None:
-                return ""
-            vol = self.plugin_base.get_volume(slot)
-            is_placeholder = isinstance(sink, _PinnedPlaceholder)
-            if is_placeholder:
-                return f"{vol}%" if vol is not None else "—"
-            prefix = "[M] " if sink.mute else ""
-            return f"{prefix}{vol}%" if vol is not None else ""
-        return s.get(custom_key, "")
+                parts.append("_")
+            else:
+                rk = self.plugin_base._app_raw_key(sink)
+                vol = self.plugin_base._volume_cache.get(rk, 0)
+                muted = (not isinstance(sink, (_PinnedPlaceholder, _MasterSink))) and sink.mute
+                parts.append(f"{rk}:{vol}:{muted}")
+        return "|".join(parts)
 
     def _update_display(self):
-        s = self.get_settings()
-        slot = s.get("slot_index", 0)
-        show_icon = s.get("show_icon", True)
-        sink = self.plugin_base.get_sink_for_slot(slot)
+        try:
+            h = self._state_hash()
+            if h == self._last_state_hash:
+                return
+            self._last_state_hash = h
+            img = self._render_image()
+            if img is None:
+                return
 
-        BetterVolumeMixer, _PinnedPlaceholder, _MasterSink, MASTER_SINK_KEY = _get_plugin_classes()
+            # Write to a per-deck temp file
+            serial = self.deck_controller.serial_number()
+            temp_path = os.path.join(tempfile.gettempdir(), f"bvm_ts_{serial}.png")
+            img.save(temp_path)
+            self._temp_path = temp_path
 
-        is_placeholder = isinstance(sink, _PinnedPlaceholder) if sink else False
-        raw_key = self.plugin_base._app_raw_key(sink) if sink else None
-        app_name = self.plugin_base._app_name(sink) if sink else ""
+            # Inject into the page's in-memory dict (no save() — keeps page JSON clean)
+            page = self.deck_controller.active_page
+            if page is None:
+                return
+            ts = page.dict.setdefault("touchscreens", {})
+            slot = ts.setdefault("sd-plus", {})
+            states = slot.setdefault("states", {})
+            state0 = states.setdefault("0", {})
+            state0.setdefault("background", {})["image"] = temp_path
 
-        # Only update icon when the slot content changes (avoids resetting GIF animation)
-        if raw_key != self._last_icon_key:
-            self._last_icon_key = raw_key
-            if sink is None or not show_icon:
-                self.set_media(media_path=None)
-            elif is_placeholder:
-                custom_icons = self.plugin_base.get_custom_icons()
-                if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
-                    self._set_icon(custom_icons[raw_key])
-                else:
-                    self.set_media(media_path=None)
-            else:
-                is_master = isinstance(sink, _MasterSink)
-                custom_icons = self.plugin_base.get_custom_icons()
-                if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
-                    icon_path = custom_icons[raw_key]
-                elif is_master:
-                    icon_path = None
-                else:
-                    icon_path = self._find_icon(self.plugin_base._app_icon_name(sink), app_name)
+            # Trigger touchscreen re-composite
+            self.get_input().update()
+        except Exception:
+            pass
+
+    def _render_image(self) -> Image.Image | None:
+        try:
+            _, _PinnedPlaceholder, _MasterSink, _ = _get_plugin_classes()
+            s = self.get_settings()
+            icon_scale = s.get("icon_scale", DEFAULTS["icon_scale"])
+
+            w, h = 800, 100
+            n_slots = 4
+            slot_w = w // n_slots
+
+            img = Image.new("RGBA", (w, h), (18, 18, 18, 255))
+            draw = ImageDraw.Draw(img)
+
+            font_name = _get_font(11)
+            font_vol = _get_font(10)
+
+            for i in range(n_slots):
+                global_slot = self.plugin_base.page_offset * n_slots + i
+                sinks = self.plugin_base.active_sinks
+                sink = sinks[global_slot] if global_slot < len(sinks) else None
+
+                x = i * slot_w
+
+                # Divider
+                if i > 0:
+                    draw.line([(x, 8), (x, h - 8)], fill=(50, 50, 50, 255), width=1)
+
+                if sink is None:
+                    draw.text((x + slot_w // 2, h // 2), "—", fill=(80, 80, 80, 255),
+                              font=font_name, anchor="mm")
+                    continue
+
+                raw_key = self.plugin_base._app_raw_key(sink)
+                app_name = self.plugin_base._app_name(sink)
+                vol = self.plugin_base._volume_cache.get(raw_key)
+                is_placeholder = isinstance(sink, _PinnedPlaceholder)
+                is_muted = (not is_placeholder) and (not isinstance(sink, _MasterSink)) and sink.mute
+
+                # Icon
+                icon_h = int(h * icon_scale)
+                icon_w = icon_h
+                icon_path = self._resolve_icon(sink, raw_key, app_name, is_placeholder)
                 if icon_path:
-                    self._set_icon(icon_path)
-                else:
-                    self.set_media(media_path=None)
+                    try:
+                        with Image.open(icon_path) as raw_img:
+                            raw_img.seek(0)
+                            icon = raw_img.convert("RGBA").resize((icon_w, icon_h), Image.LANCZOS)
+                        ix = x + (slot_w - icon_w) // 2
+                        iy = 4
+                        img.paste(icon, (ix, iy), icon)
+                    except Exception:
+                        pass
 
-        if sink is None:
-            self.set_top_label("")
-            self.set_center_label("—")
-            self.set_bottom_label("")
-            return
+                # App name
+                cx = x + slot_w // 2
+                draw.text((cx, h - 18), app_name[:10], fill=(220, 220, 220, 255),
+                          font=font_name, anchor="ms")
 
-        if is_placeholder:
-            self.set_top_label(self._resolve_label("top_content", "custom_top", slot, sink))
-            self.set_center_label(self._resolve_label("center_content", "custom_center", slot, sink))
-            self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom", slot, sink))
-            return
+                # Volume / mute
+                if is_muted:
+                    draw.text((cx, h - 6), "[M]", fill=(255, 80, 80, 255),
+                              font=font_vol, anchor="ms")
+                elif vol is not None:
+                    draw.text((cx, h - 6), f"{vol}%", fill=(150, 150, 150, 255),
+                              font=font_vol, anchor="ms")
 
-        self.set_top_label(self._resolve_label("top_content", "custom_top", slot, sink))
-        self.set_center_label(self._resolve_label("center_content", "custom_center", slot, sink))
-        self.set_bottom_label(self._resolve_label("bottom_content", "custom_bottom", slot, sink))
-
-    def _gif_fps(self, path: str) -> int:
-        """Read the average FPS from a GIF's frame delays. Returns 10 as fallback."""
-        try:
-            with Image.open(path) as img:
-                delays = []
-                for i in range(getattr(img, "n_frames", 1)):
-                    img.seek(i)
-                    d = img.info.get("duration", 100)
-                    if d > 0:
-                        delays.append(d)
-                if not delays:
-                    return 10
-                avg_delay_ms = sum(delays) / len(delays)
-                return max(1, round(1000 / avg_delay_ms))
-        except Exception:
-            return 10
-
-    def _reset_icon_cache(self):
-        """Reset icon cache for all AppDisplay actions so icons are redrawn on next update."""
-        for action in self.plugin_base._registered_actions:
-            if type(action).__name__ == "AppDisplay":
-                action._last_icon_key = None
-
-    def _set_icon(self, path: str):
-        """Set icon via set_media, using PIL for non-GIF images to preserve transparency."""
-        img = self._open_image_rgba(path)
-        if img:
-            self.set_media(image=img, size=0.6)
-        else:
-            self._set_media_path(path)
-
-    def _set_media_path(self, path: str, size: float = 0.6):
-        """Call set_media with the correct fps for GIFs, or plain media_path for others."""
-        if not path:
-            self.set_media(media_path=None)
-            return
-        ext = os.path.splitext(path)[1].lower()
-        if ext == ".gif":
-            fps = self._gif_fps(path)
-            self.set_media(media_path=path, size=size, fps=fps)
-        else:
-            self.set_media(media_path=path, size=size)
-
-    def _open_image_rgba(self, path: str) -> "Image.Image | None":
-        """Open any non-GIF image as RGBA PIL Image, preserving transparency. Returns None on failure."""
-        if not path:
-            return None
-        ext = os.path.splitext(path)[1].lower()
-        if ext == ".gif":
-            return None  # GIFs handled via media_path to preserve animation
-        try:
-            img = Image.open(path)
-            return img.convert("RGBA")
+            return img
         except Exception:
             return None
+
+    def _resolve_icon(self, sink, raw_key, app_name, is_placeholder) -> str | None:
+        _, _PinnedPlaceholder, _MasterSink, _ = _get_plugin_classes()
+        custom_icons = self.plugin_base.get_custom_icons()
+        if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
+            return custom_icons[raw_key]
+        if is_placeholder or isinstance(sink, _MasterSink):
+            return None
+        icon_name = self.plugin_base._app_icon_name(sink)
+        return self._find_icon(icon_name, app_name)
 
     def _find_icon(self, icon_name: str, app_name: str) -> str | None:
         if icon_name:
-            path = self._gtk_icon_lookup(icon_name)
-            if path:
-                return path
-            path = self._manual_icon_search(icon_name)
-            if path:
-                return path
+            p = self._gtk_icon_lookup(icon_name) or self._manual_icon_search(icon_name)
+            if p:
+                return p
         guessed = app_name.lower().replace(" ", "-")
-        path = self._gtk_icon_lookup(guessed)
-        if path:
-            return path
-        return self._manual_icon_search(guessed)
+        return self._gtk_icon_lookup(guessed) or self._manual_icon_search(guessed)
 
     def _gtk_icon_lookup(self, name: str) -> str | None:
         try:
@@ -211,11 +243,11 @@ class AppDisplay(ActionBase):
         try:
             info = theme.lookup_icon(name, [], 64, 1, Gtk.TextDirection.NONE, 0)
             if info:
-                file_obj = info.get_file()
-                if file_obj:
-                    path = file_obj.get_path()
-                    if path and os.path.exists(path):
-                        return path
+                f = info.get_file()
+                if f:
+                    p = f.get_path()
+                    if p and os.path.exists(p):
+                        return p
         except Exception:
             pass
         return None
@@ -239,31 +271,18 @@ class AppDisplay(ActionBase):
                     return p
         return None
 
-    # ── Settings UI ────────────────────────────────────────────────────────
+    # ── Settings UI ───────────────────────────────────────────────────────
 
     def get_config_rows(self) -> list:
-        self._config_open = True
         rows = []
 
-        self.slot_spinner = Adw.SpinRow.new_with_range(0, 3, 1)
-        self.slot_spinner.set_title("Column Slot (0–3)")
-        rows.append(self.slot_spinner)
-
-        self.sync_row = Adw.SwitchRow()
-        self.sync_row.set_title("Sync settings to all App Display buttons")
-        self.sync_row.set_subtitle("Changes here apply to all App Display actions")
-        rows.append(self.sync_row)
-
-        self.show_icon_row = Adw.SwitchRow()
-        self.show_icon_row.set_title("Show App Icon")
-        rows.append(self.show_icon_row)
-
-        self.top_combo, self.top_entry = self._make_label_row("Top Label", rows)
-        self.center_combo, self.center_entry = self._make_label_row("Center Label", rows)
-        self.bottom_combo, self.bottom_entry = self._make_label_row("Bottom Label", rows)
+        self.scale_spinner = Adw.SpinRow.new_with_range(0.1, 0.9, 0.05)
+        self.scale_spinner.set_title("Icon Scale")
+        self.scale_spinner.set_subtitle("Icon size relative to touchscreen height")
+        rows.append(self.scale_spinner)
 
         rows.append(self._section("App Priority Order"))
-        rows.append(self._hint("Apps shown first in the mixer. Select a row, then use the buttons below."))
+        rows.append(self._hint("Apps shown in the mixer. Select a row to reorder, pin, rename, hide or set a custom icon."))
 
         self.priority_box = Gtk.ListBox()
         self.priority_box.set_selection_mode(Gtk.SelectionMode.SINGLE)
@@ -294,17 +313,7 @@ class AppDisplay(ActionBase):
 
         self._load_config_values()
 
-        self.slot_spinner.connect("changed", self._on_display_changed)
-        self.sync_row.connect("notify::active", self._on_display_changed)
-        self.show_icon_row.connect("notify::active", self._on_display_changed)
-        for combo, entry in [(self.top_combo, self.top_entry),
-                             (self.center_combo, self.center_entry),
-                             (self.bottom_combo, self.bottom_entry)]:
-            combo.connect("notify::selected", lambda w, _, e=entry: (
-                e.set_sensitive(ROW_KEYS[w.get_selected()] == "custom"),
-                self._on_display_changed()
-            ))
-            entry.connect("changed", self._on_display_changed)
+        self.scale_spinner.connect("changed", self._on_scale_changed)
         self.btn_up.connect("clicked", self._on_move_up)
         self.btn_down.connect("clicked", self._on_move_down)
         self.btn_pin.connect("clicked", self._on_toggle_pin)
@@ -312,16 +321,6 @@ class AppDisplay(ActionBase):
         self.btn_hide.connect("clicked", self._on_hide)
         self.btn_delete.connect("clicked", self._on_delete)
         return rows
-
-    def _make_label_row(self, title, rows):
-        combo = Adw.ComboRow()
-        combo.set_title(title)
-        combo.set_model(Gtk.StringList.new(ROW_OPTIONS))
-        rows.append(combo)
-        entry = Adw.EntryRow()
-        entry.set_title(f"{title}: Custom Text")
-        rows.append(entry)
-        return combo, entry
 
     def _section(self, text: str) -> Gtk.Label:
         lbl = Gtk.Label(label=f"<b>{text}</b>")
@@ -340,54 +339,28 @@ class AppDisplay(ActionBase):
 
     def _load_config_values(self):
         s = self.get_settings()
-        self.slot_spinner.set_value(s.get("slot_index", DEFAULTS["slot_index"]))
-        self.sync_row.set_active(s.get("sync_settings", DEFAULTS["sync_settings"]))
-        self.show_icon_row.set_active(s.get("show_icon", DEFAULTS["show_icon"]))
-
-        def load_combo(combo, entry, ck, cust):
-            mode = s.get(ck, DEFAULTS[ck])
-            combo.set_selected(ROW_KEYS.index(mode) if mode in ROW_KEYS else 0)
-            entry.set_text(s.get(cust, ""))
-            entry.set_sensitive(mode == "custom")
-
-        load_combo(self.top_combo,    self.top_entry,    "top_content",    "custom_top")
-        load_combo(self.center_combo, self.center_entry, "center_content", "custom_center")
-        load_combo(self.bottom_combo, self.bottom_entry, "bottom_content", "custom_bottom")
+        self.scale_spinner.set_value(s.get("icon_scale", DEFAULTS["icon_scale"]))
         self._rebuild_priority_list()
         self._rebuild_hidden_list()
 
-    def _on_display_changed(self, *args):
+    def _on_scale_changed(self, *args):
         s = self.get_settings()
-        s["slot_index"]      = int(self.slot_spinner.get_value())
-        s["sync_settings"]   = self.sync_row.get_active()
-        s["show_icon"]       = self.show_icon_row.get_active()
-        s["top_content"]     = ROW_KEYS[self.top_combo.get_selected()]
-        s["center_content"]  = ROW_KEYS[self.center_combo.get_selected()]
-        s["bottom_content"]  = ROW_KEYS[self.bottom_combo.get_selected()]
-        s["custom_top"]      = self.top_entry.get_text()
-        s["custom_center"]   = self.center_entry.get_text()
-        s["custom_bottom"]   = self.bottom_entry.get_text()
+        s["icon_scale"] = round(self.scale_spinner.get_value(), 2)
         self.set_settings(s)
-        if s["sync_settings"]:
-            self._sync_to_siblings(s)
         self._update_display()
 
-    def _sync_to_siblings(self, settings: dict):
-        sync_keys = ["sync_settings", "show_icon", "top_content", "center_content",
-                     "bottom_content", "custom_top", "custom_center", "custom_bottom"]
-        for action in self.plugin_base._registered_actions:
-            if action is self or type(action).__name__ != "AppDisplay":
-                continue
-            try:
-                s = action.get_settings()
-                for k in sync_keys:
-                    s[k] = settings[k]
-                action.set_settings(s)
-                action._update_display()
-            except Exception:
-                pass
+    # ── Priority / Hidden list (shared with AppDisplay) ───────────────────
 
-    # ── Priority / Hidden list ─────────────────────────────────────────────
+    def _display_name_for_key(self, raw_key: str) -> str:
+        BetterVolumeMixer, _PinnedPlaceholder, _MasterSink, MASTER_SINK_KEY = _get_plugin_classes()
+        if raw_key == MASTER_SINK_KEY:
+            return self.plugin_base.get_display_name_overrides().get(MASTER_SINK_KEY, "System")
+        overrides = self.plugin_base.get_display_name_overrides()
+        if raw_key in overrides:
+            return overrides[raw_key]
+        parts = raw_key.split("|", 1)
+        binary = parts[1] if len(parts) == 2 and parts[1] else parts[0]
+        return BetterVolumeMixer.KNOWN_BINARY_ALIASES.get(binary, binary)
 
     def _clear_box(self, box):
         child = box.get_first_child()
@@ -395,19 +368,6 @@ class AppDisplay(ActionBase):
             nxt = child.get_next_sibling()
             box.remove(child)
             child = nxt
-
-    def _display_name_for_key(self, raw_key: str) -> str:
-        BetterVolumeMixer, _PinnedPlaceholder, _MasterSink, MASTER_SINK_KEY = _get_plugin_classes()
-        if raw_key == MASTER_SINK_KEY:
-            overrides = self.plugin_base.get_display_name_overrides()
-            return overrides.get(MASTER_SINK_KEY, "System")
-        overrides = self.plugin_base.get_display_name_overrides()
-        if raw_key in overrides:
-            return overrides[raw_key]
-        # Key is "appname|binary" — use binary as default display
-        parts = raw_key.split("|", 1)
-        binary = parts[1] if len(parts) == 2 and parts[1] else parts[0]
-        return BetterVolumeMixer.KNOWN_BINARY_ALIASES.get(binary, binary)
 
     def _rebuild_priority_list(self):
         self._clear_box(self.priority_box)
@@ -442,31 +402,27 @@ class AppDisplay(ActionBase):
             row = Adw.ActionRow()
             title = ("📌 " if is_pinned else "") + display
             row.set_title(title)
-
-            # Subtitle: for regular apps show the raw key so the user can see what PulseAudio reported
             if is_master:
                 row.set_subtitle("Master output volume")
             else:
                 parts = raw_key.split("|", 1)
-                raw_appname = parts[0]
-                binary      = parts[1] if len(parts) == 2 else ""
                 subtitle_parts = []
-                if raw_appname and raw_appname != display:
-                    subtitle_parts.append(raw_appname)
-                if binary and binary != display:
-                    subtitle_parts.append(binary)
+                if parts[0] and parts[0] != display:
+                    subtitle_parts.append(parts[0])
+                if len(parts) == 2 and parts[1] and parts[1] != display:
+                    subtitle_parts.append(parts[1])
                 if subtitle_parts:
                     row.set_subtitle(" · ".join(subtitle_parts))
 
             if raw_key in custom_icons:
-                row.set_subtitle((row.get_subtitle() + " · " if row.get_subtitle() else "") +
-                                 f"icon: {os.path.basename(custom_icons[raw_key])}")
+                extra = f"icon: {os.path.basename(custom_icons[raw_key])}"
+                row.set_subtitle((row.get_subtitle() + " · " if row.get_subtitle() else "") + extra)
 
             icon_btn = Gtk.Button(label="🖼")
             icon_btn.set_valign(Gtk.Align.CENTER)
             icon_btn.add_css_class("flat")
             icon_btn.set_tooltip_text("Set custom icon")
-            icon_btn.connect("clicked", lambda _, k=raw_key, r=row: self._on_set_icon(k, r))
+            icon_btn.connect("clicked", lambda _, k=raw_key: self._on_set_icon(k))
             row.add_suffix(icon_btn)
 
             listrow = Gtk.ListBoxRow()
@@ -478,7 +434,6 @@ class AppDisplay(ActionBase):
     def _rebuild_hidden_list(self):
         self._clear_box(self.hidden_box)
         hidden = self.plugin_base.get_hidden_list()
-
         if not hidden:
             row = Gtk.ListBoxRow()
             row.set_activatable(False)
@@ -490,7 +445,6 @@ class AppDisplay(ActionBase):
             row.set_child(lbl)
             self.hidden_box.append(row)
             return
-
         for raw_key in hidden:
             display = self._display_name_for_key(raw_key)
             row = Adw.ActionRow()
@@ -501,6 +455,10 @@ class AppDisplay(ActionBase):
             btn.connect("clicked", self._on_unhide, raw_key)
             row.add_suffix(btn)
             self.hidden_box.append(row)
+
+    def _visible_priority(self) -> list[str]:
+        hidden = self.plugin_base.get_hidden_list()
+        return [p for p in self.plugin_base.get_priority_list() if p not in hidden]
 
     def _reselect(self, app: str):
         row = self.priority_box.get_first_child()
@@ -515,10 +473,6 @@ class AppDisplay(ActionBase):
                 return
             row = row.get_next_sibling()
 
-    def _visible_priority(self) -> list[str]:
-        hidden = self.plugin_base.get_hidden_list()
-        return [p for p in self.plugin_base.get_priority_list() if p not in hidden]
-
     def _on_row_selected(self, listbox, row):
         if row is None or not hasattr(row, "_app_name"):
             self._selected_app = None
@@ -529,19 +483,21 @@ class AppDisplay(ActionBase):
             is_master = getattr(row, "_is_master", False)
             for b in (self.btn_up, self.btn_down, self.btn_pin, self.btn_rename, self.btn_hide, self.btn_delete):
                 b.set_sensitive(True)
-            # Master sink can't be hidden or deleted
             self.btn_hide.set_sensitive(not is_master)
             self.btn_delete.set_sensitive(not is_master)
             pinned = self.plugin_base.get_pinned_list()
             self.btn_pin.set_label("📌 Unpin" if self._selected_app in pinned else "📌 Pin")
 
+    def _save_reordered(self, visible: list[str]):
+        hidden = self.plugin_base.get_hidden_list()
+        hidden_entries = [p for p in self.plugin_base.get_priority_list() if p in hidden]
+        self.plugin_base.set_priority_list(visible + hidden_entries)
+
     def _on_move_up(self, _):
         if not self._selected_app:
             return
         visible = self._visible_priority()
-        if self._selected_app not in visible:
-            return
-        idx = visible.index(self._selected_app)
+        idx = visible.index(self._selected_app) if self._selected_app in visible else -1
         if idx <= 0:
             return
         visible[idx], visible[idx - 1] = visible[idx - 1], visible[idx]
@@ -554,21 +510,14 @@ class AppDisplay(ActionBase):
         if not self._selected_app:
             return
         visible = self._visible_priority()
-        if self._selected_app not in visible:
-            return
-        idx = visible.index(self._selected_app)
-        if idx >= len(visible) - 1:
+        idx = visible.index(self._selected_app) if self._selected_app in visible else -1
+        if idx < 0 or idx >= len(visible) - 1:
             return
         visible[idx], visible[idx + 1] = visible[idx + 1], visible[idx]
         self._save_reordered(visible)
         self._rebuild_priority_list()
         self._reselect(self._selected_app)
         self.plugin_base._refresh_sinks()
-
-    def _save_reordered(self, visible: list[str]):
-        hidden = self.plugin_base.get_hidden_list()
-        hidden_entries = [p for p in self.plugin_base.get_priority_list() if p in hidden]
-        self.plugin_base.set_priority_list(visible + hidden_entries)
 
     def _on_hide(self, _):
         if not self._selected_app:
@@ -582,14 +531,22 @@ class AppDisplay(ActionBase):
         self._rebuild_hidden_list()
         self.plugin_base._refresh_sinks()
 
+    def _on_unhide(self, _, raw_key: str):
+        hidden = self.plugin_base.get_hidden_list()
+        if raw_key in hidden:
+            hidden.remove(raw_key)
+            self.plugin_base.set_hidden_list(hidden)
+        self._rebuild_priority_list()
+        self._rebuild_hidden_list()
+        self.plugin_base._refresh_sinks()
+
     def _on_delete(self, _):
         if not self._selected_app:
             return
         _, _PP, _MS, MASTER_SINK_KEY = _get_plugin_classes()
         if self._selected_app == MASTER_SINK_KEY:
-            return  # System entry cannot be deleted
+            return
         key = self._selected_app
-        # Remove from all lists — the app will re-appear automatically next time it runs
         priority = [p for p in self.plugin_base.get_priority_list() if p != key]
         hidden   = [p for p in self.plugin_base.get_hidden_list()   if p != key]
         pinned   = [p for p in self.plugin_base.get_pinned_list()   if p != key]
@@ -628,21 +585,12 @@ class AppDisplay(ActionBase):
         raw_key = self._selected_app
         current = self._display_name_for_key(raw_key)
 
-        parent = None
-        widget = self.priority_box
-        while widget:
-            if isinstance(widget, Gtk.Window):
-                parent = widget
-                break
-            widget = widget.get_parent()
-
+        parent = self._get_parent_window()
         dialog = Adw.MessageDialog(
-            transient_for=parent,
-            modal=True,
-            heading=f"Rename",
-            body=f"Set a custom display name for \"{current}\".",
+            transient_for=parent, modal=True,
+            heading="Rename",
+            body=f'Set a custom display name for "{current}".',
         )
-
         entry = Gtk.Entry()
         entry.set_placeholder_text("Display name…")
         entry.set_text(current)
@@ -651,7 +599,6 @@ class AppDisplay(ActionBase):
         entry.set_margin_start(4)
         entry.set_margin_end(4)
         dialog.set_extra_child(entry)
-
         dialog.add_response("cancel", "Cancel")
         dialog.add_response("reset", "Reset to default")
         dialog.set_response_appearance("reset", Adw.ResponseAppearance.DESTRUCTIVE)
@@ -679,36 +626,17 @@ class AppDisplay(ActionBase):
         entry.connect("activate", lambda _: dialog.response("set"))
         dialog.present()
 
-    def _on_unhide(self, _, raw_key: str):
-        hidden = self.plugin_base.get_hidden_list()
-        if raw_key in hidden:
-            hidden.remove(raw_key)
-            self.plugin_base.set_hidden_list(hidden)
-        self._rebuild_priority_list()
-        self._rebuild_hidden_list()
-        self.plugin_base._refresh_sinks()
-
-    def _on_set_icon(self, raw_key: str, action_row):
+    def _on_set_icon(self, raw_key: str):
         custom_icons = self.plugin_base.get_custom_icons()
-
-        parent = None
-        widget = self.priority_box
-        while widget:
-            if isinstance(widget, Gtk.Window):
-                parent = widget
-                break
-            widget = widget.get_parent()
-
+        parent = self._get_parent_window()
         display = self._display_name_for_key(raw_key)
         dialog = Adw.MessageDialog(
-            transient_for=parent,
-            modal=True,
+            transient_for=parent, modal=True,
             heading=f"Custom icon for {display}",
-            body="Enter the absolute path to a PNG or SVG file.",
+            body="Enter the absolute path to a PNG, SVG or GIF file.",
         )
-
         entry = Gtk.Entry()
-        entry.set_placeholder_text("/home/user/icons/spotify.png")
+        entry.set_placeholder_text("/home/user/icons/app.png")
         entry.set_margin_top(8)
         entry.set_margin_bottom(4)
         entry.set_margin_start(4)
@@ -728,14 +656,9 @@ class AppDisplay(ActionBase):
             f.set_name("Image files")
             for m in ("image/png", "image/svg+xml", "image/gif"):
                 f.add_mime_type(m)
-            fall = Gtk.FileFilter()
-            fall.set_name("All files")
-            fall.add_pattern("*")
             filters = Gio.ListStore.new(Gtk.FileFilter)
             filters.append(f)
-            filters.append(fall)
             fd.set_filters(filters)
-            fd.set_default_filter(f)
             def on_done(d, result):
                 try:
                     file = d.open_finish(result)
@@ -746,7 +669,6 @@ class AppDisplay(ActionBase):
             fd.open(parent, None, on_done)
 
         browse_btn.connect("clicked", on_browse)
-
         box = Gtk.Box(orientation=Gtk.Orientation.VERTICAL, spacing=0)
         box.append(entry)
         box.append(browse_btn)
@@ -769,16 +691,27 @@ class AppDisplay(ActionBase):
                     icons[raw_key] = path
                     self.plugin_base.set_custom_icons(icons)
                     self._rebuild_priority_list()
-                    self._reset_icon_cache()
                     self.plugin_base._notify_actions()
+                    self._update_display()
             elif response == "clear":
                 icons.pop(raw_key, None)
                 self.plugin_base.set_custom_icons(icons)
                 self._rebuild_priority_list()
-                self._reset_icon_cache()
                 self.plugin_base._notify_actions()
+                self._update_display()
             d.destroy()
 
         dialog.connect("response", on_response)
         entry.connect("activate", lambda _: dialog.response("set"))
         dialog.present()
+
+    def _get_parent_window(self):
+        try:
+            widget = self.scale_spinner
+            while widget:
+                if isinstance(widget, Gtk.Window):
+                    return widget
+                widget = widget.get_parent()
+        except Exception:
+            pass
+        return None

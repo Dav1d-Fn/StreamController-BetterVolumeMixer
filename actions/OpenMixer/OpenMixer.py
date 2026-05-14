@@ -47,6 +47,11 @@ class OpenMixer(ActionBase):
         self.plugin_base.unregister_action(self)
 
     def on_key_down(self):
+        try:
+            serial = self.deck_controller.serial_number()
+            self.plugin_base.set_origin_page(serial, self.deck_controller.active_page.json_path)
+        except Exception:
+            pass
         self._load_page(self.plugin_base.mixer_page_path())
 
     def _load_page(self, path: str):
