@@ -43,7 +43,13 @@ class NavBack(ActionBase):
         self.plugin_base.unregister_action(self)
 
     def on_key_down(self):
-        self._load_page(self.plugin_base.main_page_path())
+        try:
+            serial = self.deck_controller.serial_number()
+        except Exception:
+            return
+        origin = self.plugin_base.get_origin_page(serial)
+        if origin:
+            self._load_page(origin)
 
     def _load_page(self, path: str):
         if not path or not os.path.exists(path):

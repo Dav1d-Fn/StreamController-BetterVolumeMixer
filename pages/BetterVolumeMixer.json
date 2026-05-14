@@ -3,9 +3,26 @@
         "0x0": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::NavBack", "settings": {}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavBack",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "Back",
+                                "custom_bottom": ""
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -13,9 +30,27 @@
         "0x1": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::NavRight", "settings": {}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavRight",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "page",
+                                "custom_top": "",
+                                "custom_center": "\u2192",
+                                "custom_bottom": "",
+                                "hide_on_single_page": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -23,9 +58,27 @@
         "0x2": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::NavLeft", "settings": {}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::NavLeft",
+                            "settings": {
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "page",
+                                "custom_top": "",
+                                "custom_center": "\u2190",
+                                "custom_bottom": "",
+                                "hide_on_single_page": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -33,9 +86,30 @@
         "1x0": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 0, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeUp",
+                            "settings": {
+                                "slot_index": 0,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25b2",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -43,9 +117,30 @@
         "1x1": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 0, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::AppDisplay",
+                            "settings": {
+                                "slot_index": 0,
+                                "show_icon": true,
+                                "show_title": true,
+                                "show_volume": true,
+                                "top_content": "appname",
+                                "center_content": "custom",
+                                "bottom_content": "volume",
+                                "custom_top": "",
+                                "custom_center": "",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -53,9 +148,30 @@
         "1x2": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 0, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeDown",
+                            "settings": {
+                                "slot_index": 0,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25bc",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -63,9 +179,30 @@
         "2x0": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 1, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeUp",
+                            "settings": {
+                                "slot_index": 1,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25b2",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -73,9 +210,30 @@
         "2x1": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 1, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::AppDisplay",
+                            "settings": {
+                                "slot_index": 1,
+                                "show_icon": true,
+                                "show_title": true,
+                                "show_volume": true,
+                                "top_content": "appname",
+                                "center_content": "custom",
+                                "bottom_content": "volume",
+                                "custom_top": "",
+                                "custom_center": "",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -83,9 +241,30 @@
         "2x2": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 1, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeDown",
+                            "settings": {
+                                "slot_index": 1,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25bc",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -93,9 +272,30 @@
         "3x0": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 2, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeUp",
+                            "settings": {
+                                "slot_index": 2,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25b2",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -103,9 +303,30 @@
         "3x1": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 2, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::AppDisplay",
+                            "settings": {
+                                "slot_index": 2,
+                                "show_icon": true,
+                                "show_title": true,
+                                "show_volume": true,
+                                "top_content": "appname",
+                                "center_content": "custom",
+                                "bottom_content": "volume",
+                                "custom_top": "",
+                                "custom_center": "",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -113,9 +334,30 @@
         "3x2": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 2, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeDown",
+                            "settings": {
+                                "slot_index": 2,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25bc",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -123,9 +365,30 @@
         "4x0": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeUp", "settings": {"slot_index": 3, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeUp",
+                            "settings": {
+                                "slot_index": 3,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25b2",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -133,9 +396,30 @@
         "4x1": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::AppDisplay", "settings": {"slot_index": 3, "show_icon": true, "show_title": true, "show_volume": true}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::AppDisplay",
+                            "settings": {
+                                "slot_index": 3,
+                                "show_icon": true,
+                                "show_title": true,
+                                "show_volume": true,
+                                "top_content": "appname",
+                                "center_content": "custom",
+                                "bottom_content": "volume",
+                                "custom_top": "",
+                                "custom_center": "",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }
@@ -143,9 +427,30 @@
         "4x2": {
             "states": {
                 "0": {
-                    "actions": [{"id": "com_dav1dfn_BetterVolumeMixer::VolumeDown", "settings": {"slot_index": 3, "volume_step": 5, "show_volume": false, "custom_icon_path": ""}}],
+                    "actions": [
+                        {
+                            "id": "com_dav1dfn_BetterVolumeMixer::VolumeDown",
+                            "settings": {
+                                "slot_index": 3,
+                                "volume_step": 5,
+                                "show_volume": false,
+                                "custom_icon_path": "",
+                                "top_content": "custom",
+                                "center_content": "custom",
+                                "bottom_content": "custom",
+                                "custom_top": "",
+                                "custom_center": "\u25bc",
+                                "custom_bottom": "",
+                                "sync_settings": true
+                            }
+                        }
+                    ],
                     "image-control-action": 0,
-                    "label-control-actions": [0, 0, 0],
+                    "label-control-actions": [
+                        0,
+                        0,
+                        0
+                    ],
                     "background-control-action": 0
                 }
             }

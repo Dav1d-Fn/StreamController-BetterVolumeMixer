@@ -91,17 +91,16 @@ class AppDisplay(ActionBase):
         # Only update icon when the slot content changes (avoids resetting GIF animation)
         if raw_key != self._last_icon_key:
             self._last_icon_key = raw_key
-            if sink is None:
+            if sink is None or not show_icon:
                 self.set_media(media_path=None)
             elif is_placeholder:
-                # Placeholder: show custom icon if set
-                if show_icon:
-                    custom_icons = self.plugin_base.get_custom_icons()
-                    if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
-                        self._set_icon(custom_icons[raw_key])
-            elif show_icon:
-                BetterVolumeMixer2, _PP2, _MasterSink2, _MSK2 = _get_plugin_classes()
-                is_master = isinstance(sink, _MasterSink2)
+                custom_icons = self.plugin_base.get_custom_icons()
+                if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
+                    self._set_icon(custom_icons[raw_key])
+                else:
+                    self.set_media(media_path=None)
+            else:
+                is_master = isinstance(sink, _MasterSink)
                 custom_icons = self.plugin_base.get_custom_icons()
                 if raw_key in custom_icons and os.path.exists(custom_icons[raw_key]):
                     icon_path = custom_icons[raw_key]
@@ -111,7 +110,8 @@ class AppDisplay(ActionBase):
                     icon_path = self._find_icon(self.plugin_base._app_icon_name(sink), app_name)
                 if icon_path:
                     self._set_icon(icon_path)
-                # No icon found: don't call set_media — avoids placeholder image
+                else:
+                    self.set_media(media_path=None)
 
         if sink is None:
             self.set_top_label("")

@@ -4,6 +4,10 @@ from src.backend.DeckManagement.InputIdentifier import Input
 from src.backend.PluginManager.ActionInputSupport import ActionInputSupport
 
 import sys, os, threading, time, json
+import globals as gl
+import gi
+gi.require_version("GLib", "2.0")
+from gi.repository import GLib
 
 import pulsectl
 
@@ -16,6 +20,8 @@ from plugins.com_dav1dfn_BetterVolumeMixer.actions.NavLeft.NavLeft import NavLef
 from plugins.com_dav1dfn_BetterVolumeMixer.actions.VolumeUp.VolumeUp import VolumeUp
 from plugins.com_dav1dfn_BetterVolumeMixer.actions.VolumeDown.VolumeDown import VolumeDown
 from plugins.com_dav1dfn_BetterVolumeMixer.actions.AppDisplay.AppDisplay import AppDisplay
+from plugins.com_dav1dfn_BetterVolumeMixer.actions.DialVolumeControl.DialVolumeControl import DialVolumeControl
+from plugins.com_dav1dfn_BetterVolumeMixer.actions.TouchscreenMixer.TouchscreenMixer import TouchscreenMixer
 
 SLOTS_PER_PAGE = 4
 
@@ -89,6 +95,7 @@ class BetterVolumeMixer(PluginBase):
         self._volume_cache: dict[str, int] = {}  # raw_key -> last known volume %
         self._registered_actions: list = []
         self._plugin_settings: dict = self._load_plugin_settings()
+        self._origin_page: dict[str, str] = {}  # serial_number -> page path before opening mixer
 
         self._stop_polling = threading.Event()
         self._poll_thread = threading.Thread(target=self._poll_loop, daemon=True)
@@ -97,6 +104,11 @@ class BetterVolumeMixer(PluginBase):
         key_only = {
             Input.Key: ActionInputSupport.SUPPORTED,
             Input.Dial: ActionInputSupport.UNSUPPORTED,
+            Input.Touchscreen: ActionInputSupport.UNSUPPORTED,
+        }
+        dial_only = {
+            Input.Key: ActionInputSupport.UNSUPPORTED,
+            Input.Dial: ActionInputSupport.SUPPORTED,
             Input.Touchscreen: ActionInputSupport.UNSUPPORTED,
         }
 
@@ -114,6 +126,18 @@ class BetterVolumeMixer(PluginBase):
             action_id_suffix="VolumeDown", action_name="Volume Down", action_support=key_only))
         self.add_action_holder(ActionHolder(plugin_base=self, action_base=AppDisplay,
             action_id_suffix="AppDisplay", action_name="App Display", action_support=key_only))
+        self.add_action_holder(ActionHolder(plugin_base=self, action_base=DialVolumeControl,
+            action_id_suffix="DialVolumeControl", action_name="Dial: Volume Control",
+            action_support=dial_only))
+
+        touchscreen_only = {
+            Input.Key: ActionInputSupport.UNSUPPORTED,
+            Input.Dial: ActionInputSupport.UNSUPPORTED,
+            Input.Touchscreen: ActionInputSupport.SUPPORTED,
+        }
+        self.add_action_holder(ActionHolder(plugin_base=self, action_base=TouchscreenMixer,
+            action_id_suffix="TouchscreenMixer", action_name="Touchscreen: Mixer Swipe",
+            action_support=touchscreen_only))
 
         self.register(
             plugin_name="Better Volume Mixer",
@@ -124,27 +148,38 @@ class BetterVolumeMixer(PluginBase):
 
         self.register_page(os.path.join(self.PATH, "pages", "BetterVolumeMixer.json"))
 
+        GLib.idle_add(self._ensure_startup_page_default)
+
     # ── Page paths ────────────────────────────────────────────────────────
 
     def mixer_page_path(self) -> str:
         return os.path.join(self.PATH, "pages", "BetterVolumeMixer.json")
 
-    def main_page_path(self) -> str:
-        pages_dir = os.path.join(
-            os.path.expanduser("~"),
-            ".var", "app", "com.core447.StreamController", "data", "pages"
-        )
-        for name in ("Main.json", "main.json"):
-            p = os.path.join(pages_dir, name)
-            if os.path.exists(p):
-                return p
+    def set_origin_page(self, serial: str, path: str):
+        self._origin_page[serial] = path
+
+    def get_origin_page(self, serial: str) -> str:
+        return self._origin_page.get(serial, "")
+
+    def _ensure_startup_page_default(self):
+        """Set the default startup page to the first user-created page (not a plugin page)."""
         try:
-            for f in sorted(os.listdir(pages_dir)):
-                if f.endswith(".json"):
-                    return os.path.join(pages_dir, f)
+            user_pages_dir = os.path.join(
+                os.path.expanduser("~"),
+                ".var", "app", "com.core447.StreamController", "data", "pages"
+            )
+            user_pages = sorted(
+                f for f in os.listdir(user_pages_dir) if f.endswith(".json")
+            )
+            if not user_pages:
+                return
+            first_user_page = os.path.join(user_pages_dir, user_pages[0])
+            for controller in gl.deck_manager.deck_controller:
+                serial = controller.deck.get_serial_number()
+                if gl.page_manager.get_default_page_for_deck(serial) is None:
+                    gl.page_manager.set_default_page_for_deck(serial, first_user_page)
         except Exception:
             pass
-        return ""
 
     # ── Plugin settings ───────────────────────────────────────────────────
 
