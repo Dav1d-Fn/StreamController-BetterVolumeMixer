@@ -147,6 +147,7 @@ class BetterVolumeMixer(PluginBase):
         )
 
         self.register_page(os.path.join(self.PATH, "pages", "BetterVolumeMixer.json"))
+        self.register_page(os.path.join(self.PATH, "pages", "BetterVolumeMixer_Plus.json"))
 
         GLib.idle_add(self._ensure_startup_page_default)
 
