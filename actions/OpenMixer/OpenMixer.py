@@ -366,6 +366,26 @@ class OpenMixer(ActionBase):
         dialog.connect("response", lambda d, _: d.destroy())
         dialog.present()
 
+    def _persist_picked_file(self, src_path: str) -> str:
+        """Copy a file picked via Gtk.FileDialog into the plugin's own data dir.
+
+        Files outside the Flatpak sandbox (e.g. an external drive) come back
+        from the portal as an ephemeral /run/user/<uid>/doc/... path that
+        stops resolving after an app restart. Copying into plugin_base.PATH
+        (which is always sandbox-writable) makes the reference permanent.
+        """
+        if not src_path:
+            return src_path
+        dst_dir = os.path.join(self.plugin_base.PATH, "custom_icons")
+        os.makedirs(dst_dir, exist_ok=True)
+        dst_path = os.path.join(dst_dir, os.path.basename(src_path))
+        if os.path.abspath(src_path) != os.path.abspath(dst_path) and not os.path.exists(dst_path):
+            try:
+                shutil.copy(src_path, dst_path)
+            except shutil.SameFileError:
+                pass
+        return dst_path
+
     def _on_browse(self, _):
         parent = self._get_parent_window()
         fd = Gtk.FileDialog()
@@ -386,7 +406,7 @@ class OpenMixer(ActionBase):
             try:
                 file = d.open_finish(result)
                 if file:
-                    self.icon_entry.set_text(file.get_path())
+                    self.icon_entry.set_text(self._persist_picked_file(file.get_path()))
             except Exception:
                 pass
         fd.open(parent, None, on_done)
