@@ -117,6 +117,14 @@ Better Volume Mixer detects app icons automatically via GTK's icon theme. For ap
 
 ---
 
+## Donations
+
+If you enjoy the plugin and want to support its development, you can buy me a coffee:
+
+[![ko-fi](https://ko-fi.com/img/githubbutton_sm.svg)](https://ko-fi.com/davidfn)
+
+---
+
 ## License
 
 [GPL-3.0](LICENSE)
